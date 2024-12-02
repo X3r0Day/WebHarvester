@@ -8,13 +8,11 @@ import re
 class AdvancedScraper:
     def __init__(self):
         self.request_count = 0
+        self.visited_urls = set() # (Correct me if I'm wrong, making list for keeping check on visited can be so unefficient for more depths, right? If you can come up with something else, please create an issue!!)
 
     def extract_emails(self, html):
-        emails = set()
-        # Yeah an breainfuck looking pattern for email
         email_pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-        emails = re.findall(email_pattern, html)
-        return list(set(emails))
+        return list(set(re.findall(email_pattern, html)))
 
     def extract_links(self, html, base_url):
         links = set()
@@ -36,23 +34,24 @@ class AdvancedScraper:
             params = url.split('?')[1].split('&')
             for param in params:
                 param_name = param.split('=')[0]
-                if param_name in ['q', 'search', 'test', 'id', 'page', 'query', 'user', 'action']: # Add more xss payloads if you want (Incase you are lazy, I've added some of the most common ones lmao)
+                if param_name in ['q', 'search', 'test', 'id', 'page', 'query', 'user', 'action', 's', 'lang', 'p', 'item', 'blog', 'url', 'l', 'item', 'page_id', 'name', 'password', 'email', 'type', 'year', 'view', 'comment', 'showComment']:
                     xss_params.append(f"{url} ({param})")
         elif "=" in url:
             xss_params.append(f"{url} (single param)")
-
         return xss_params
 
     def crawl(self, url, depth, args):
         collected_data = []
         xss_urls = []
 
-        if depth <= 0:
+        if depth <= 0 or url in self.visited_urls:
             return collected_data, xss_urls
 
         print(f"Fetching URL: {url}")
+        self.visited_urls.add(url)  # Say no to re-visit visited urls
+
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=10)  # Finally added timeout in case it stucks for infintely long
             self.request_count += 1
             html = response.text
             links = self.extract_links(html, url)
